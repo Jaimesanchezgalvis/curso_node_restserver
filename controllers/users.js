@@ -1,41 +1,63 @@
-const { response } = require("express");
+const { response, request } = require("express");
+const bcryptjs = require("bcryptjs");
 
-const userGet = (req, res = response) => {
-  const { q, nombre = "No name", apikey, page = 1, limit } = req.query;
+const Users = require("../models/usuario");
+
+const userGet = async (req = request, res = response) => {
+  const { limite = 5, desde = 0 } = req.query;
+  const query = { estado: true };
+
+  const [total, usuarios] = await Promise.all([
+    Users.countDocuments(query),
+    Users.find(query).skip(Number(desde)).limit(Number(limite)),
+  ]);
 
   res.json({
-    msg: "get API",
-    q,
-    nombre,
-    apikey,
-    page,
-    limit,
+    total,
+    usuarios,
   });
 };
 
-const userPost = (req, res = response) => {
-  const body = req.body;
+const userPost = async (req, res = response) => {
+  const { nombre, correo, password, rol } = req.body;
+  const user = new Users({ nombre, correo, password, rol });
+
+  // Encriptar la contraseña
+  const salt = bcryptjs.genSaltSync();
+  user.password = bcryptjs.hashSync(password, salt);
+
+  await user.save();
 
   res.json({
     msg: "post API",
-    body,
+    user,
   });
 };
 
-const userPut = (req, res = response) => {
-  const id = req.params.id;
+const userPut = async (req, res = response) => {
+  const { id } = req.params;
+  const { _id, password, google, correo, ...resto } = req.body;
 
-  res.json({
-    msg: "put API",
-    id,
-  });
+  if (password) {
+    // Encriptar la contraseña
+    const salt = bcryptjs.genSaltSync();
+    resto.password = bcryptjs.hashSync(password, salt);
+  }
+
+  const user = await Users.findByIdAndUpdate(id, resto);
+
+  res.json(user);
 };
 
-const userDelete = (req, res = response) => {
-  const body = req.body;
+const userDelete = async (req, res = response) => {
+  const { id } = req.params;
+
+  // Físicamente lo borramos
+  const user = await Users.findByIdAndUpdate(id, { estado: false });
+
   res.json({
     msg: "delete API",
-    body,
+    user,
   });
 };
 
